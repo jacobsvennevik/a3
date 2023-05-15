@@ -149,9 +149,9 @@ non terminal                  VarDeclSeq,
 non terminal DeclNode.ProcedureNode  ProcedureDef;
 non terminal SymEntry.ProcedureEntry ProcedureHead;
 non terminal 
-                              FormalParamList;
+             List<ExpNode>           FormalParamList;
 non terminal
-                              ActualParamList;
+             List<ExpNode>             ActualParamList;
 non terminal List<StatementNode> StatementList;
 non terminal StatementNode    Statement,
                               CompoundStatement;
@@ -159,7 +159,9 @@ non terminal ExpNode          Condition,
                               RelCondition,
                               Exp,
                               Term,
-                              Factor;
+                              Factor,
+                              FormalParam,
+                              ActualParam;
 non terminal Operator         Relation,
                               AddOp,
                               MulOp,
@@ -371,19 +373,37 @@ ProcedureHead ::= KW_PROCEDURE IDENTIFIER:id
             LPAREN FormalParamList:pl 
             RPAREN
         {:
+            /* Create a ProcedureType for the procedure */
+            Type.ProcedureType procType = new Type.ProcedureType(idxleft);
+
+            /* Create a list to hold ParamEntry objects */
+            List<SymEntry.ParamEntry> paramEntries = new LinkedList<>();
+
+           /* Convert each formal parameter to a ParamEntry and add it to the list */
+           for (ExpNode param : pl) {
+               Type parType = param.getType();
+               boolean isRef =  parType instanceof Type.ReferenceType;
+               SymEntry.ParamEntry paramEntry = new SymEntry.ParamEntry(parType.getName(), param.getLocation(),
+                    parType, isRef);
+               paramEntries.add(paramEntry);
+                      }
+
+            /* Set the list of formal parameters for the ProcedureType */
+            procType.setFormalParams(paramEntries);
+
             /* Add an entry for the procedure to the current scope */
             SymEntry.ProcedureEntry procEntry = currentScope.addProcedure(id, idxleft);
             if(procEntry == null) {
                 errors.error(id + " already declared in this scope", idxleft);
-                /* Create a dummy symbol table entry.
-                 * Note that this entry isn't added to the symbol table
-                 * but the RESULT attribute of ProcedureHead must return a
-                 * ProcedureEntry. */
-                procEntry = new SymEntry.ProcedureEntry(id, idxleft);
+                /* Create a dummy symbol table entry. Note that this entry isn't added to the symbol table but the RESULT attribute of ProcedureHead must return a ProcedureEntry. */
+                procEntry = new SymEntry.ProcedureEntry(id, idxleft, procType);
                 procEntry.setScope(currentScope);
             }
-            /* Create a new scope for the symbols local to
-             * the procedure. */
+            /* Add each formal parameter to the current scope */
+            for (SymEntry.ParamEntry paramEntry : paramEntries) {
+                currentScope.addEntry(paramEntry);
+            }
+            /* Create a new scope for the symbols local to the procedure. */
             currentScope = currentScope.newScope(procEntry);
             RESULT = procEntry;
         :}
@@ -403,8 +423,46 @@ ProcedureHead ::= KW_PROCEDURE IDENTIFIER:id
 
 
 /* To allow for the addition of procedure parameters. */
-FormalParamList ::= /* empty */
+// I added
+FormalParamList ::= FormalParam:p
+        {:
+            List<ExpNode> pl = new ArrayList<>();
+            pl.add(p);
+            RESULT = pl;
+        :}
+    | FormalParamList:pl COMMA FormalParam:p
+        {:
+            pl.add(p);
+            RESULT = pl;
+        :}
     ;
+
+FormalParam ::= IDENTIFIER:id COLON TypeIdentifier:type GETS Condition:c
+    {:
+        RESULT = new ExpNode.FormalParamNode(idxleft, id, type, c);
+    :}
+    | KW_VAR IDENTIFIER:id COLON TypeIdentifier:type GETS LValue:lv
+    {:
+        RESULT = new ExpNode.FormalParamNode(idxleft, id, type, lv);
+    :}
+    ;
+
+ActualParamList ::= ActualParam:p
+    {:
+        List<ExpNode> pl = new ArrayList<>();
+        pl.add(p);
+        RESULT = pl;
+    :}
+    | ActualParamList:pl COMMA ActualParam:p
+        {:
+            pl.add(p);
+            RESULT = pl;
+        :}
+
+    ;
+
+
+
 
 CompoundStatement ::= KW_BEGIN StatementList:sl KW_END
         {:
@@ -450,7 +508,7 @@ Statement ::= KW_WHILE Condition:c KW_DO Statement:s
        :} 
     |  KW_CALL IDENTIFIER:id LPAREN ActualParamList:pl RPAREN
         {: 
-            RESULT = new StatementNode.CallNode(idxleft, id);
+            RESULT = new StatementNode.CallNode(idxleft, id, pl);
         :}
     |  error:loc
         {: 
@@ -458,9 +516,6 @@ Statement ::= KW_WHILE Condition:c KW_DO Statement:s
         :}
     ;
 
-
-ActualParamList ::= /* empty */
-    ;
 
 LValue ::= IDENTIFIER:id
         {:

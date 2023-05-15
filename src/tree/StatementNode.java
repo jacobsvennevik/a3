@@ -283,9 +283,20 @@ public abstract class StatementNode {
         private final String id;
         private SymEntry.ProcedureEntry procEntry;
 
-        public CallNode(Location loc, String id) {
+
+        private List<ExpNode> pl;
+        public CallNode(Location loc, String id, List<ExpNode> pl) {
             super(loc);
             this.id = id;
+            this.pl = pl;
+        }
+
+        public List<ExpNode> getPl() {
+            return pl;
+        }
+
+        public void setPl(List<ExpNode> pl) {
+            this.pl = pl;
         }
 
         @Override

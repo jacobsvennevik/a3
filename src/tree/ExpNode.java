@@ -2,7 +2,6 @@ package tree;
 
 import java.util.*;
 
-import java_cup.runtime.ComplexSymbolFactory;
 import java_cup.runtime.ComplexSymbolFactory.Location;
 import syms.SymEntry;
 import syms.Type;
@@ -430,5 +429,79 @@ public abstract class ExpNode {
             return "WidenSubrange(" + exp + ":" + getType() + ")";
         }
     }
+
+
+    public static class FormalParamNode extends ExpNode {
+        private String id;
+
+        private Type type;
+        private ExpNode c;
+
+
+        public FormalParamNode(Location loc, String id, Type type, ExpNode c) {
+            super(loc);
+            this.id = id;
+            this.type = type;
+            this.c = c;
+        }
+
+
+        public String getId() {
+            return id;
+        }
+
+        public ExpNode getC() {
+            return c;
+        }
+
+        public void setC(ExpNode c) {
+            this.c = c;
+        }
+
+        @Override
+        public String toString() {
+            return "FormalParamNode(" + id + ", " + type + ", " + c + ")";
+        }
+
+        @Override
+        public ExpNode transform(ExpTransform<ExpNode> visitor) {
+            return null;
+        }
+
+        @Override
+        public Code genCode(ExpTransform<Code> visitor) {
+            return null;
+        }
+    }
+
+
+
+    public static class ActualParamNode extends ExpNode {
+        private String id;
+        private ExpNode c;
+
+        public ActualParamNode(Location loc, String id, ExpNode c) {
+            super(loc);
+            this.id = id;
+            this.c = c;
+        }
+
+
+        @Override
+        public String toString() {
+            return "ActualParamNode(" + id + ", " + c + ")";
+        }
+
+        @Override
+        public ExpNode transform(ExpTransform<ExpNode> visitor) {
+            return null;
+        }
+
+        @Override
+        public Code genCode(ExpTransform<Code> visitor) {
+            return null;
+        }
+    }
+
 
 }
