@@ -66,6 +66,7 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
      */
     public void visitProcedureNode(DeclNode.ProcedureNode node) {
         beginCheck("Procedure");
+        System.out.println("Static checker");
         SymEntry.ProcedureEntry procEntry = node.getProcEntry();
         // Save the block's abstract syntax tree in the procedure entry
         procEntry.setBlock(node.getBlock());
@@ -484,6 +485,34 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
         endCheck("WidenSubrange");
         return node;
     }
+
+    @Override
+    public ExpNode visitFormalParamNode(ExpNode.FormalParamNode node) {
+
+        beginCheck("FormalParam");
+
+        // Retrieve the identifier from the node
+        String id = node.getId();
+
+        // Look up the identifier in the current scope of the symbol table
+        SymEntry entry = currentScope.lookup(id);
+
+        // If the entry exists and it's a ParamEntry (or whatever your equivalent is), then this is okay
+        if (entry instanceof SymEntry.ParamEntry) {
+            // Potentially perform additional checks or actions here...
+        } else {
+            // If the identifier is not found or it's not a ParamEntry, this is an error
+            staticError("Parameter identifier required", node.getLocation());
+            // Potentially replace the node with an ErrorNode or similar here...
+        }
+
+        endCheck("FormalParam");
+
+        // Return the (potentially modified) node
+        return node;
+    }
+
+
 
     //**************************** Support Methods
 

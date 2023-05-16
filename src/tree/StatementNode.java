@@ -285,10 +285,11 @@ public abstract class StatementNode {
 
 
         private List<ExpNode> pl;
-        public CallNode(Location loc, String id, List<ExpNode> pl) {
+        //List<ExpNode> pl
+        public CallNode(Location loc, String id) {
             super(loc);
             this.id = id;
-            this.pl = pl;
+            //this.pl = pl;
         }
 
         public List<ExpNode> getPl() {

@@ -464,14 +464,10 @@ public abstract class ExpNode {
         }
 
         @Override
-        public ExpNode transform(ExpTransform<ExpNode> visitor) {
-            return null;
-        }
+        public ExpNode transform(ExpTransform<ExpNode> visitor) {return visitor.visitFormalParamNode(this);}
 
         @Override
-        public Code genCode(ExpTransform<Code> visitor) {
-            return null;
-        }
+        public Code genCode(ExpTransform<Code> visitor) {return visitor.visitFormalParamNode(this);}
     }
 
 
