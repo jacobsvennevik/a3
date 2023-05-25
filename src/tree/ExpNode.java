@@ -69,6 +69,12 @@ public abstract class ExpNode {
      */
     public abstract Code genCode(ExpTransform<Code> visitor);
 
+    /*
+    * Making it easier checking for repeated ActualParameters */
+    public String getId() {
+        return null;
+    }
+
     /**
      * Tree node representing an erroneous expression.
      */
@@ -431,73 +437,122 @@ public abstract class ExpNode {
     }
 
 
-    public static class FormalParamNode extends ExpNode {
+    public static class ActualParamNode extends ExpNode {
         private String id;
+        private ExpNode condition;
 
-        private Type type;
-        private ExpNode c;
+        private SymEntry.ParamEntry entry;
 
 
-        public FormalParamNode(Location loc, String id, Type type, ExpNode c) {
+        public ActualParamNode(Location loc, String id, ExpNode condition) {
             super(loc);
             this.id = id;
-            this.type = type;
-            this.c = c;
+            this.condition = condition;
         }
-
 
         public String getId() {
             return id;
         }
 
-        public ExpNode getC() {
-            return c;
+        public ExpNode getCondition() {
+            return condition;
         }
 
-        public void setC(ExpNode c) {
-            this.c = c;
+        public void setCondition(ExpNode condition) {
+            this.condition = condition;
+        }
+
+        public SymEntry.ParamEntry getEntry() {
+            return entry;
+        }
+
+        public void setEntry(SymEntry.ParamEntry entry) {
+            this.entry = entry;
         }
 
         @Override
         public String toString() {
-            return "FormalParamNode(" + id + ", " + type + ", " + c + ")";
+            return this.getClass().getSimpleName() + "(" + id + ", " + condition + ")";
         }
-
-        @Override
-        public ExpNode transform(ExpTransform<ExpNode> visitor) {return visitor.visitFormalParamNode(this);}
-
-        @Override
-        public Code genCode(ExpTransform<Code> visitor) {return visitor.visitFormalParamNode(this);}
-    }
-
-
-
-    public static class ActualParamNode extends ExpNode {
-        private String id;
-        private ExpNode c;
-
-        public ActualParamNode(Location loc, String id, ExpNode c) {
-            super(loc);
-            this.id = id;
-            this.c = c;
-        }
-
-
-        @Override
-        public String toString() {
-            return "ActualParamNode(" + id + ", " + c + ")";
-        }
-
         @Override
         public ExpNode transform(ExpTransform<ExpNode> visitor) {
-            return null;
+            return visitor.visitActualParamNode(this);
         }
 
         @Override
         public Code genCode(ExpTransform<Code> visitor) {
-            return null;
+            return visitor.visitActualParamNode(this);
         }
+
     }
 
 
+
+
+
+
+
+
+
+
+
+    public static class ActualParamListNode extends ExpNode {
+
+        private Map<String, ExpNode> paramNodes;
+        private SymEntry.ProcedureEntry entry;
+
+        public ActualParamListNode(Location loc, Map<String, ExpNode> paramNodes) {
+            super(loc);
+            this.paramNodes = paramNodes;
+        }
+
+/*        // Add a new ActualParamNode along with its id
+        public boolean addParamNode(ExpNode node) {
+            // Before adding check if the id already exists in the list
+            String idNode = node.getId();
+            System.out.println(" get: " + getParamNodes() + " " + idNode + " " + getParamNodes().contains(node));
+            if (!getParamNodes().contains(node)) {
+                paramNodes.add(node);
+                return true;
+            }
+           return false;
+        }*/
+
+
+        public Map<String, ExpNode> getParamNodes() {
+            return paramNodes;
+        }
+
+        public void setParamNodes(Map<String, ExpNode> paramNodes) {
+            this.paramNodes = paramNodes;
+        }
+
+
+        @Override
+        public String toString() {
+            return "FormalListNode(" + paramNodes + ")";
+        }
+
+        @Override
+        public ExpNode transform(ExpTransform<ExpNode> visitor) {
+            // Implement according to your requirements
+            return visitor.visitActualParamListNode(this);
+        }
+
+        @Override
+        public Code genCode(ExpTransform<Code> visitor) {
+            return visitor.visitActualParamListNode(this);
+        }
+
+
+        public void setEntry(SymEntry.ProcedureEntry procEntry) {
+            this.entry = procEntry;
+        }
+
+        public SymEntry.ProcedureEntry getEntry() {
+            return this.entry;
+        }
+
+
+    }
 }

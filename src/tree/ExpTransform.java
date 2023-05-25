@@ -22,5 +22,8 @@ public interface ExpTransform<ResultType> {
 
     ResultType visitWidenSubrangeNode(ExpNode.WidenSubrangeNode node);
 
-    ResultType visitFormalParamNode(ExpNode.FormalParamNode node);
+    ResultType visitActualParamListNode(ExpNode.ActualParamListNode node);
+
+    ResultType visitActualParamNode(ExpNode.ActualParamNode node);
+
 }

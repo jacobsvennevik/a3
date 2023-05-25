@@ -6,6 +6,7 @@ import machine.Operation;
 import machine.StackMachine;
 import source.Errors;
 import source.VisitorDebugger;
+
 import syms.SymEntry;
 import syms.Type;
 import tree.StatementNode.*;
@@ -90,6 +91,8 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         staticLevel++;
         node.getProcedures().accept(this);
         staticLevel--;
+        //System.out.println(code);
+        //System.out.println("blocCode: " + code);
         endGen("Block");
         return code;
     }
@@ -131,6 +134,7 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         code.append(node.getVariable().genCode(this));
         /* Generate the store based on the type/size of value */
         code.genStore(node.getExp().getType());
+        //System.out.println("assignment " + code);
         endGen("Assignment");
         return code;
     }
@@ -148,6 +152,7 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         code.append(node.getLValue().genCode(this));
         /* Generate the store based on the type/size of value */
         code.genStore(node.getLValue().getType().optDereferenceType());
+        //System.out.println("visitRead " + code);
         endGen("Read");
         return code;
     }
@@ -172,12 +177,23 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         beginGen("Call");
         SymEntry.ProcedureEntry proc = node.getEntry();
         Code code = new Code();
-        code.genComment("call " + proc.getIdent() + ":");
+        code.genComment("Call " + proc + ":");
+        ExpNode paramsNode = node.getPl();
+        int procLevel = proc.getLevel();
+        int parameterSpace = proc.getLocalScope().getParameterSpace();
+        // Generate code for actual parameters
+        // Generate the call instruction.
+        code.genCall(staticLevel - procLevel, proc);
         /* Generate the call instruction. The second parameter is the
          * procedure's symbol table entry. The actual address is resolved
          * at load time.
          */
-        code.genCall(staticLevel - proc.getLevel(), proc);
+        if(node.getPl() != null) {
+            //System.out.println("!null " + code);
+            code.append(paramsNode.genCode(this));
+            //System.out.println("!null " + code);
+        }
+        System.out.println("callCode" + code + "proc");
         endGen("Call");
         return code;
     }
@@ -385,7 +401,9 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         beginGen("Variable");
         SymEntry.VarEntry var = node.getVariable();
         Code code = new Code();
+        code.genComment("variable" + node.getId() + ":");
         code.genMemRef(staticLevel - var.getLevel(), var.getOffset());
+        //System.out.println("variable " + code);
         endGen("Variable");
         return code;
     }
@@ -416,10 +434,52 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         return code;
     }
 
-    @Override
-    public Code visitFormalParamNode(ExpNode.FormalParamNode node) {
-        return null;
+    public Code visitActualParamListNode(ExpNode.ActualParamListNode node) {
+        beginGen("ActualFormalList");
+        Code code = new Code();
+        // Convert the values of the LinkedHashMap to a list
+        List<ExpNode> paramsList = new ArrayList<>(node.getParamNodes().values());
+        // Reverse the list
+        Collections.reverse(paramsList);
+
+        for (ExpNode exp : paramsList) {
+
+            code.append(exp.genCode(this));
+        }
+        endGen("ActualFormalList");
+        return code;
     }
+
+    public Code visitActualParamNode(ExpNode.ActualParamNode node) {
+        beginGen("ActualFormal");
+
+        // Generate the code for the actual parameter
+        Code code = new Code();
+        code.genComment("Processing Parameter " + node.getCondition());
+        code.append(node.getCondition().genCode(this));
+        // Retrieve the formal parameter entry associated with the actual parameter
+        SymEntry.ParamEntry entry = node.getEntry();
+        //System.out.println("Hey bby " + node.getType() + " entry " + node.getEntry() + " code so far " + code);
+        if (entry.isRef()) {
+            //System.out.println("in this bitch");
+            // For reference parameters, generate code to push the address of
+            // the actual parameter onto the stack. This is achieved by
+            // generating a memory reference relative to the current frame pointer.
+            code.genMemRef(staticLevel - entry.getLevel(), entry.getOffset());
+        } else {
+            // For value parameters, generate code to push the value of the
+            // actual parameter onto the stack. This is done by generating a
+            // store instruction which will store the value at the top of the stack.
+            //System.out.println("heey " + node.getCondition().getType());
+            code.genStore(entry.getType().getBaseType());
+        }
+
+        endGen("ActualFormal");
+        //System.out.println("code " + code +" " + node.getCondition().getType() +  "  entry " );
+        // Return the generated code
+        return code;
+    }
+
     //**************************** Support Methods
 
     /**

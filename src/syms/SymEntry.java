@@ -271,7 +271,7 @@ public abstract class SymEntry {
          * @param type   of parameter (ReferenceType is added by super constructor)
          * @param isRef  true if and only if this is a reference parameter
          */
-        public ParamEntry(String id, Location loc, Type type, boolean isRef) {
+        public  ParamEntry(String id, Location loc, Type type, boolean isRef) {
             super(id, loc, type);
             this.isRef = isRef;
         }

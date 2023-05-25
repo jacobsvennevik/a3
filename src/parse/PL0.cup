@@ -148,10 +148,9 @@ non terminal                  VarDeclSeq,
                               VarDecl;
 non terminal DeclNode.ProcedureNode  ProcedureDef;
 non terminal SymEntry.ProcedureEntry ProcedureHead;
+non terminal     SymEntry.ParamEntry     FormalParam;
 non terminal
-            List<ExpNode>           FormalParamList;
-non terminal
-                              ActualParamList;
+            Type.ProcedureType           FormalParamList;
 non terminal List<StatementNode> StatementList;
 non terminal StatementNode    Statement,
                               CompoundStatement;
@@ -160,7 +159,8 @@ non terminal ExpNode          Condition,
                               Exp,
                               Term,
                               Factor,
-                              FormalParam;
+                              ActualParam;
+non terminal Map<String, ExpNode> ActualParamList;
 non terminal Operator         Relation,
                               AddOp,
                               MulOp,
@@ -371,7 +371,6 @@ ProcedureDef ::= ProcedureHead:procEntry EQUALS Block:b SEMICOLON
 ProcedureHead ::= KW_PROCEDURE IDENTIFIER:id
             LPAREN RPAREN
         {:
-            System.out.println("head: formalParamList no head " + id);
             /* Add an entry for the procedure to the current scope */
             SymEntry.ProcedureEntry procEntry = currentScope.addProcedure(id, idxleft);
             if(procEntry == null) {
@@ -385,33 +384,31 @@ ProcedureHead ::= KW_PROCEDURE IDENTIFIER:id
             }
             /* Create a new scope for the symbols local to
              * the procedure. */
-
             currentScope = currentScope.newScope(procEntry);
             RESULT = procEntry;
-            System.out.println("currentScope: " + currentScope + " result: " + RESULT);
         :}
-    | KW_PROCEDURE IDENTIFIER:id
-      LPAREN FormalParamList:pl RPAREN
-              {:
-                System.out.println("head: formalParamList");
-                SymEntry.ProcedureEntry procEntry = currentScope.addProcedure(id, idxleft);
-                Type.ProcedureType procType = new Type.ProcedureType(idxleft);
-                /* Create a list to hold ParamEntry objects */
-                List<SymEntry.ParamEntry> paramEntries = new LinkedList<>();
-                for (ExpNode param : pl) {
-                    Type parType = param.getType();
-                    boolean isRef =  parType instanceof Type.ReferenceType;
-                    SymEntry.ParamEntry paramEntry = new SymEntry.ParamEntry(parType.getName(), param.getLocation(),
-                    parType, isRef);
-                    paramEntries.add(paramEntry);
-                    System.out.println("PARAMENTRY: " + paramEntry);
-                }
-
-                currentScope.addType(id, idxleft, procType);
-                currentScope = currentScope.newScope(procEntry);
-                RESULT = procEntry;
-                System.out.println("currentScope: " + currentScope + " result: " + RESULT);
-              :}
+    | KW_PROCEDURE IDENTIFIER:id LPAREN FormalParamList:pl RPAREN
+          {:
+              /* Similar operations as in the first production, but involving `pl` */
+              SymEntry.ProcedureEntry procEntry = new SymEntry.ProcedureEntry(id, idxleft, pl);
+              currentScope.addEntry(procEntry);
+              if(procEntry == null) {
+                  errors.error(id + " already declared in this scope", idxleft);
+                  procEntry = new SymEntry.ProcedureEntry(id, idxleft);
+                  procEntry.setScope(currentScope);
+              }
+              currentScope = currentScope.newScope(procEntry);
+              /* If `pl` is a list of parameters, add them to `procEntry` */
+              Scope localScope = procEntry.getLocalScope();
+              localScope.allocParameterSpace(pl.getFormalParams().size());
+              for (SymEntry.ParamEntry paramEntry: pl.getFormalParams()){
+                SymEntry entry = localScope.addEntry(paramEntry);
+                if(entry == null) {
+                    errors.error(paramEntry.getIdent() + " repeated", paramEntry.getLocation());
+                    }
+              }
+              RESULT = procEntry;
+          :}
     |  KW_PROCEDURE IDENTIFIER:id error
         {:
             /* On a syntax error in a procedure head a dummy ProcedureEntry is
@@ -430,35 +427,36 @@ ProcedureHead ::= KW_PROCEDURE IDENTIFIER:id
 /* To allow for the addition of procedure parameters. */
 FormalParamList ::= FormalParam:p
         {:
-            List<ExpNode> pl = new ArrayList<>();
-            pl.add(p);
-            RESULT = pl;
+             Type.ProcedureType procType = new Type.ProcedureType(pxleft);
+             procType.getFormalParams().add(p);
+             RESULT = procType;
         :}
    | FormalParam:p COMMA FormalParamList:pl
         {:
-            pl.add(0, p);
+
+            pl.getFormalParams().add(0,p);
             RESULT = pl;
          :}
-   ;
+    ;
 
 /* Boolean whether the formal parameter is a reference parameter or not. */
 FormalParam ::=
     IDENTIFIER:id COLON TypeIdentifier:type GETS Condition:c
         {:
-            RESULT = new ExpNode.FormalParamNode(idxleft, id, type, c);
+            RESULT = new SymEntry.ParamEntry(id, idxleft, type, false, c);
         :}
     | IDENTIFIER:id COLON TypeIdentifier:type
-          {:
-              RESULT = new ExpNode.FormalParamNode(idxleft, id, type, null);
-          :}
+        {:
+            RESULT = new SymEntry.ParamEntry(id, idxleft, type, false);
+        :}
     | KW_VAR IDENTIFIER:id COLON TypeIdentifier:type GETS LValue:lv
         {:
-            RESULT = new ExpNode.FormalParamNode(idxleft, id, type, lv);
+            RESULT = new SymEntry.ParamEntry(id, idxleft, type, true, lv);
         :}
     | KW_VAR IDENTIFIER:id COLON TypeIdentifier:type
-         {:
-            RESULT = new ExpNode.FormalParamNode(idxleft, id, type, null);
-         :}
+        {:
+            RESULT = new SymEntry.ParamEntry(id, idxleft, type, true);
+        :}
     ;
 
 
@@ -504,9 +502,16 @@ Statement ::= KW_WHILE Condition:c KW_DO Statement:s
        {:
           RESULT = new StatementNode.AssignmentNode(lvalxleft, lval, rval);
        :}
-    |  KW_CALL IDENTIFIER:id LPAREN ActualParamList:pl RPAREN
+    |  KW_CALL IDENTIFIER:id LPAREN RPAREN
+            {:
+                RESULT = new StatementNode.CallNode(idxleft, id);
+            :}
+    |  KW_CALL IDENTIFIER:id LPAREN ActualParamList:apl RPAREN
         {:
-            RESULT = new StatementNode.CallNode(idxleft, id);
+
+            RESULT = new StatementNode.CallNode(idxleft, id, new ExpNode.ActualParamListNode(aplxleft, apl));
+            //currentScope = currentScope.getParent();
+
         :}
     |  error:loc
         {:
@@ -515,9 +520,29 @@ Statement ::= KW_WHILE Condition:c KW_DO Statement:s
     ;
 
 
-ActualParamList ::= /* empty */
+ActualParamList ::= ActualParam:ap
+    {:
+        Map<String, ExpNode> actualParameters = new HashMap<>();
+        actualParameters.put(ap.getId(), ap);
+        RESULT = actualParameters;
+    :}
+| ActualParam:ap COMMA ActualParamList:apl
+    {:
+        String apId = ap.getId();
+        if(apl.containsKey(apId)){
+            errors.error(apId + " repeated", aplxleft);
+        }
+        apl.put(apId, ap);
+        RESULT = apl;
+    :}
     ;
 
+ActualParam ::= IDENTIFIER:id GETS Condition:c
+    {:
+        RESULT = new ExpNode.ActualParamNode(idxleft, id, c);
+    :}
+
+;
 LValue ::= IDENTIFIER:id
         {:
             /* At this stage the identifier could be either a constant identifier or

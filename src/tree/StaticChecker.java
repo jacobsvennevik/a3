@@ -66,20 +66,23 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
      */
     public void visitProcedureNode(DeclNode.ProcedureNode node) {
         beginCheck("Procedure");
-        System.out.println("Static checker");
+        //System.out.println("hei hei localScope level" + node.procEntry.getLocalScope());
         SymEntry.ProcedureEntry procEntry = node.getProcEntry();
         // Save the block's abstract syntax tree in the procedure entry
         procEntry.setBlock(node.getBlock());
         // The local scope is that for the procedure.
         Scope localScope = procEntry.getLocalScope();
+        //System.out.println("local " + localScope + " level vettu " + localScope.getLevel());
         /* Resolve all references to identifiers within the declarations. */
         localScope.resolveScope();
+        //System.out.println("hey " + localScope);
         // Enter the local scope of the procedure
         currentScope = localScope;
         // Check the block of the procedure.
         visitBlockNode(node.getBlock());
         // Restore the symbol table to the parent scope
         currentScope = currentScope.getParent();
+        //System.out.println("at the end maybe, ");
         endCheck("Procedure");
     }
 
@@ -178,15 +181,45 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
      */
     public void visitCallNode(StatementNode.CallNode node) {
         beginCheck("Call");
+        //System.out.println(node.getId());
         // Look up the symbol table entry for the procedure.
         SymEntry entry = currentScope.lookup(node.getId());
         if (entry instanceof SymEntry.ProcedureEntry) {
             SymEntry.ProcedureEntry procEntry = (SymEntry.ProcedureEntry) entry;
             node.setEntry(procEntry);
-        } else {
-            staticError("Procedure identifier required", node.getLocation());
-        }
+
+            // Get the list of formal parameters for this procedure.
+            List<SymEntry.ParamEntry> formalParams = procEntry.getType().getFormalParams();
+            ExpNode actualParamList = node.getPl();
+            if (actualParamList != null) {
+/*               Compare the size of the actual parameters with the formal parameters */
+                if(actualParamList instanceof ExpNode.ActualParamListNode) {
+                    ExpNode.ActualParamListNode aParamList = (ExpNode.ActualParamListNode) actualParamList;
+                    aParamList.setEntry(procEntry);
+
+                    Scope oldScope = currentScope;  // Preserve the old scope
+                    currentScope = procEntry.getLocalScope();
+                    ExpNode newNode = actualParamList.transform(this);
+                    node.setPl(newNode);
+                    currentScope = oldScope;
+                }
+            }
+                //When there is noe actualParams, and there is noe defultParams we call an error, and set offset
+                int offset = 0;
+                for (SymEntry.ParamEntry param : formalParams) {
+                    if (param.getDefaultExp() == null && actualParamList == null){
+                        staticError("no actual parameter for " + param.getIdent(), node.getLocation());
+                    }else{
+                        param.setOffset(offset);
+                        offset++;
+                    }
+
+            }
+
+            }
+
         endCheck("Call");
+
     }
 
     /**
@@ -449,7 +482,6 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
             // Undefined identifier or a type or procedure identifier.
             // Set up new node to be an error node.
             newNode = new ExpNode.ErrorNode(node.getLocation());
-            //System.out.println("Entry = " + entry);
             staticError("Constant or variable identifier required", node.getLocation());
         }
         endCheck("Identifier");
@@ -487,30 +519,52 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
     }
 
     @Override
-    public ExpNode visitFormalParamNode(ExpNode.FormalParamNode node) {
+    public ExpNode visitActualParamListNode(ExpNode.ActualParamListNode node) {
+        beginCheck("ActualParamList");
+        Map<String, ExpNode> ActualParamNodes = node.getParamNodes();
 
-        beginCheck("FormalParam");
-
-        // Retrieve the identifier from the node
-        String id = node.getId();
-
-        // Look up the identifier in the current scope of the symbol table
-        SymEntry entry = currentScope.lookup(id);
-
-        // If the entry exists and it's a ParamEntry (or whatever your equivalent is), then this is okay
-        if (entry instanceof SymEntry.ParamEntry) {
-            // Potentially perform additional checks or actions here...
-        } else {
-            // If the identifier is not found or it's not a ParamEntry, this is an error
-            staticError("Parameter identifier required", node.getLocation());
-            // Potentially replace the node with an ErrorNode or similar here...
+        //Goes trough each ActualParamNode and transforms them
+        for (ExpNode exp : ActualParamNodes.values()){
+            ExpNode TExp = exp.transform(this);
+            ActualParamNodes.put(exp.getId(), TExp);
         }
-
-        endCheck("FormalParam");
-
-        // Return the (potentially modified) node
+        endCheck("ActualParamList");
         return node;
     }
+
+    @Override
+    public ExpNode visitActualParamNode(ExpNode.ActualParamNode node) {
+        beginCheck("ActualParam");
+        SymEntry entry = currentScope.lookupLocal(node.getId());
+        if (entry == null) {
+            staticError("not a parameter of procedure", node.getLocation());
+        } else if(entry instanceof SymEntry.ParamEntry) {
+            SymEntry.ParamEntry paramEntry = (SymEntry.ParamEntry) entry;
+
+            node.setEntry(paramEntry);
+            ExpNode transformedCondition = node.getCondition().transform(this);
+            Type formalParamType = entry.getType();
+            Type actualParamType = transformedCondition.getType();
+
+            if(!paramEntry.isRef()){
+                formalParamType = formalParamType.optDereferenceType();
+                ExpNode coercedExp = formalParamType.coerceExp(transformedCondition);
+                node.setCondition(coercedExp);
+            } else {
+                try {
+                    ExpNode coercedExp = formalParamType.coerceToType(transformedCondition);
+                    node.setCondition(coercedExp);
+                } catch (IncompatibleTypes ex){
+                    staticError("actual parameter type should be " + formalParamType+ " not " +  actualParamType , transformedCondition.getLocation());
+                }
+            }
+            node.setCondition(transformedCondition);
+
+        }
+        endCheck("ActualParam");
+        return node;
+    }
+
 
 
 
