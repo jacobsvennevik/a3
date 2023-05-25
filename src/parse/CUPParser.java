@@ -1209,7 +1209,7 @@ class CUP$CUPParser$actions {
 		Map<String,ExpNode> apl = (Map<String,ExpNode>)((java_cup.runtime.Symbol) CUP$CUPParser$stack.elementAt(CUP$CUPParser$top-1)).value;
 		
 
-            RESULT = new StatementNode.CallNode(idxleft, id, new ExpNode.ActualParamListNode(aplxleft, apl));
+            RESULT = new StatementNode.CallNode(idxleft, id, apl);
             //currentScope = currentScope.getParent();
 
         

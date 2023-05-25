@@ -160,7 +160,7 @@ non terminal ExpNode          Condition,
                               Term,
                               Factor,
                               ActualParam;
-non terminal Map<String, ExpNode> ActualParamList;
+non terminal             Map<String,ExpNode> ActualParamList;
 non terminal Operator         Relation,
                               AddOp,
                               MulOp,
@@ -509,7 +509,7 @@ Statement ::= KW_WHILE Condition:c KW_DO Statement:s
     |  KW_CALL IDENTIFIER:id LPAREN ActualParamList:apl RPAREN
         {:
 
-            RESULT = new StatementNode.CallNode(idxleft, id, new ExpNode.ActualParamListNode(aplxleft, apl));
+            RESULT = new StatementNode.CallNode(idxleft, id, apl);
             //currentScope = currentScope.getParent();
 
         :}

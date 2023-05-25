@@ -5,7 +5,6 @@ import java.util.*;
 import java_cup.runtime.ComplexSymbolFactory.Location;
 import syms.Scope;
 import syms.SymEntry;
-import syms.Type;
 
 /**
  * class StatementNode - Abstract syntax tree representation of statements.
@@ -283,24 +282,24 @@ public abstract class StatementNode {
     public static class CallNode extends StatementNode {
         private final String id;
         private SymEntry.ProcedureEntry procEntry;
-        private ExpNode pl;
+        private Map<String,ExpNode> pl;
 
         public CallNode(Location loc, String id) {
             super(loc);
             this.id = id;
         }
 
-        public CallNode(Location loc, String id, ExpNode pl) {
+        public CallNode(Location loc, String id, Map<String,ExpNode> pl) {
             super(loc);
             this.id = id;
             this.pl = pl;
         }
 
-        public ExpNode getPl() {
+        public Map<String,ExpNode> getFormalParamMap() {
             return pl;
         }
 
-        public void setPl(ExpNode pl) {
+        public void setPl(Map<String,ExpNode> pl) {
             this.pl = pl;
         }
 

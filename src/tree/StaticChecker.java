@@ -181,45 +181,43 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
      */
     public void visitCallNode(StatementNode.CallNode node) {
         beginCheck("Call");
-        //System.out.println(node.getId());
+
         // Look up the symbol table entry for the procedure.
         SymEntry entry = currentScope.lookup(node.getId());
-        if (entry instanceof SymEntry.ProcedureEntry) {
-            SymEntry.ProcedureEntry procEntry = (SymEntry.ProcedureEntry) entry;
-            node.setEntry(procEntry);
+        if (!(entry instanceof SymEntry.ProcedureEntry)) {
+            endCheck("Call");
+            return;
+        }
 
-            // Get the list of formal parameters for this procedure.
-            List<SymEntry.ParamEntry> formalParams = procEntry.getType().getFormalParams();
-            ExpNode actualParamList = node.getPl();
-            if (actualParamList != null) {
-/*               Compare the size of the actual parameters with the formal parameters */
-                if(actualParamList instanceof ExpNode.ActualParamListNode) {
-                    ExpNode.ActualParamListNode aParamList = (ExpNode.ActualParamListNode) actualParamList;
-                    aParamList.setEntry(procEntry);
+        SymEntry.ProcedureEntry procEntry = (SymEntry.ProcedureEntry) entry;
+        node.setEntry(procEntry);
 
-                    Scope oldScope = currentScope;  // Preserve the old scope
-                    currentScope = procEntry.getLocalScope();
-                    ExpNode newNode = actualParamList.transform(this);
-                    node.setPl(newNode);
-                    currentScope = oldScope;
-                }
+        // Get the list of formal parameters for this procedure.
+        List<SymEntry.ParamEntry> formalParams = procEntry.getType().getFormalParams();
+
+        // Get the actual parameters and transform each one
+        Map<String, ExpNode> actualParamNodes = node.getFormalParamMap();
+        Scope oldScope = currentScope;  // Preserve the old scope
+        currentScope = procEntry.getLocalScope();
+        if(actualParamNodes != null) {
+            for (ExpNode exp : actualParamNodes.values()) {
+                exp.transform(this);
             }
-                //When there is noe actualParams, and there is noe defultParams we call an error, and set offset
-                int offset = 0;
-                for (SymEntry.ParamEntry param : formalParams) {
-                    if (param.getDefaultExp() == null && actualParamList == null){
-                        staticError("no actual parameter for " + param.getIdent(), node.getLocation());
-                    }else{
-                        param.setOffset(offset);
-                        offset++;
-                    }
+        }
+        currentScope = oldScope;
 
+        // Handle missing parameters and offsets
+        int offset = 0;
+        for (SymEntry.ParamEntry param : formalParams) {
+            if (param.getDefaultExp() == null && !actualParamNodes.containsKey(param.getIdent())) {
+                staticError("no actual parameter for " + param.getIdent(), node.getLocation());
+            } else {
+                param.setOffset(offset);
+                offset++;
             }
-
-            }
+        }
 
         endCheck("Call");
-
     }
 
     /**
@@ -518,19 +516,6 @@ public class StaticChecker implements DeclVisitor, StatementVisitor,
         return node;
     }
 
-    @Override
-    public ExpNode visitActualParamListNode(ExpNode.ActualParamListNode node) {
-        beginCheck("ActualParamList");
-        Map<String, ExpNode> ActualParamNodes = node.getParamNodes();
-
-        //Goes trough each ActualParamNode and transforms them
-        for (ExpNode exp : ActualParamNodes.values()){
-            ExpNode TExp = exp.transform(this);
-            ActualParamNodes.put(exp.getId(), TExp);
-        }
-        endCheck("ActualParamList");
-        return node;
-    }
 
     @Override
     public ExpNode visitActualParamNode(ExpNode.ActualParamNode node) {

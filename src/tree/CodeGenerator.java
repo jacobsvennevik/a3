@@ -3,12 +3,10 @@ package tree;
 import java.util.*;
 
 import machine.Operation;
-import machine.StackMachine;
 import source.Errors;
 import source.VisitorDebugger;
 
 import syms.SymEntry;
-import syms.Type;
 import tree.StatementNode.*;
 
 /**
@@ -178,7 +176,9 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         SymEntry.ProcedureEntry proc = node.getEntry();
         Code code = new Code();
         code.genComment("Call " + proc + ":");
-        ExpNode paramsNode = node.getPl();
+        List<ExpNode> paramsList = new ArrayList<>(node.getFormalParamMap().values());
+        // Reverse the list
+        Collections.reverse(paramsList);
         int procLevel = proc.getLevel();
         int parameterSpace = proc.getLocalScope().getParameterSpace();
         // Generate code for actual parameters
@@ -188,10 +188,11 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
          * procedure's symbol table entry. The actual address is resolved
          * at load time.
          */
-        if(node.getPl() != null) {
-            //System.out.println("!null " + code);
-            code.append(paramsNode.genCode(this));
-            //System.out.println("!null " + code);
+        for(ExpNode exp : paramsList){
+            System.out.println("exp: " + exp);
+        }
+        for(SymEntry symentry : proc.getLocalScope().getEntries()){
+            System.out.println("Symmentry : " + symentry.);
         }
         System.out.println("callCode" + code + "proc");
         endGen("Call");
@@ -434,21 +435,7 @@ public class CodeGenerator implements DeclVisitor, StatementTransform<Code>,
         return code;
     }
 
-    public Code visitActualParamListNode(ExpNode.ActualParamListNode node) {
-        beginGen("ActualFormalList");
-        Code code = new Code();
-        // Convert the values of the LinkedHashMap to a list
-        List<ExpNode> paramsList = new ArrayList<>(node.getParamNodes().values());
-        // Reverse the list
-        Collections.reverse(paramsList);
 
-        for (ExpNode exp : paramsList) {
-
-            code.append(exp.genCode(this));
-        }
-        endGen("ActualFormalList");
-        return code;
-    }
 
     public Code visitActualParamNode(ExpNode.ActualParamNode node) {
         beginGen("ActualFormal");
